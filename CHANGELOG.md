@@ -1,5 +1,9 @@
 # V1.0.0 — 2026-10-20
 
+Installer packaging update: the primary EXE download now runs a per-user setup wizard.
+Includes Arabic/English pages, shortcuts, Windows uninstall registration, guarded
+reinstallation and preserved user preferences. Application payload remains unchanged.
+
 First public GitHub release. Internal 4.x prototypes preceded this public version.
 
 - Offline prayer calculations, next-prayer countdown, and customizable reminders.

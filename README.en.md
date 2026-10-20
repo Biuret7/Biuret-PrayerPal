@@ -9,10 +9,14 @@ customizable prayer/Azkar reminders, Arabic RTL UI, and local preferences.
 
 ![Dark dashboard](docs/images/main-dark.png)
 
-## Run without Python
+## Install without Python
 
 Download `BiuretPrayerPal-V1.0.0-Windows-x64.exe` from the [V1.0.0 release](https://github.com/Biuret7/Biuret-PrayerPal/releases/tag/V1.0.0).
-It is a portable x64 Windows executable. No Python installation is required. The EXE is unsigned.
+The primary download is now a **Windows installer**. Run its wizard, then open the app
+from Start. It installs for your current account without administrator elevation,
+with a Start shortcut, optional desktop shortcut, and Windows uninstall entry.
+Preferences survive reinstall/uninstall. [Installer and build guide](docs/INSTALLER.md).
+No Python installation is required. Both installer and app are unsigned.
 Configure your city and time zone before relying on its reminders.
 
 ## Try the included Adhan — no extra file needed
