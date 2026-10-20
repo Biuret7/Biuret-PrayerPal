@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a reproducible PrayerPal issue
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the steps and expected behavior. Do not include private paths or personal data.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PrayerPal and Windows versions
+      placeholder: V1.0.0, Windows 11 x64
+    validations:
+      required: true
