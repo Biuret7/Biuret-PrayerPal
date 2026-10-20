@@ -26,9 +26,8 @@ The uninstaller removes explicitly installed files and shortcuts. Personal
 preferences under `MyApps/PrayerReminder`, custom audio, and unrelated files remain.
 It does not recursively erase the installation directory.
 
-The previous portable binary is retained as `BiuretPrayerPal-V1.0.0-Portable-Windows-x64.exe`.
-`V1.0.0-initial-portable.sha256` is an archived original checksum document; the separate
-`Portable-Windows-x64.exe.sha256` names the portable asset correctly.
+The release distributes the Windows installer. The earlier Portable download and
+its checksum files have been removed from the release.
 
 ## Build the installer
 
