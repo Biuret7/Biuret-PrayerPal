@@ -1,0 +1,13 @@
+artifacts/
+*.zip
+*.zip.sha256
+__pycache__/
+*.py[cod]
+.test-tmp/
+.venv/
+.venv-build/
+build/
+dist/
+release/
+.env
+.env.*
