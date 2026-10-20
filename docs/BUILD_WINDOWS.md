@@ -1,3 +1,6 @@
+> To create the installable distribution, continue with [INSTALLER.md](INSTALLER.md)
+> after building the application payload below. GitHub’s primary EXE download is now the installer.
+
 # Build Biuret PrayerPal for Windows
 
 These are the complete build inputs for the existing **PySide6 / Qt 6** application.

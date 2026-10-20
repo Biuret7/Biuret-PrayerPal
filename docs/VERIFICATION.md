@@ -15,3 +15,20 @@ the old file was preserved. The frozen smoke check passed before publication.
 
 The executable is unsigned. Clean-PC installation without Python, signing, Narrator,
 multiple physical monitors and broader audio-device/codec coverage remain unverified.
+
+## Installer packaging update — 2026-10-20
+
+The primary EXE URL now serves the NSIS installer; the original application
+payload is unchanged and retained under the Portable filename.
+
+- NSIS 3.13 ZIP SHA-256 matched the officially published checksum.
+- Compiler warnings treated as errors; explicit UTF-8, Arabic/English tables.
+- Final installer PE GUI subsystem and asInvoker manifest verified.
+- Real silent install in a Unicode path with spaces, registry registration and Start shortcut passed.
+- Reinstall, unowned-folder refusal and locked-file refusal passed.
+- Installed application GUI, bundled WAV and Adhan MP3 smoke checks passed.
+- Uninstall removed its records/shortcuts and retained unrelated files and preferences.
+- Installer SHA-256: `51857cdfb90eb4581cd9675b672f50710313094bfe1c170b5e1e1d22433d120e`.
+
+The wizard's interactive flow, desktop option, Narrator, signing and a clean
+Windows machine without development tools remain unverified.
