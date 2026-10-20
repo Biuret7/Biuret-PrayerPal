@@ -1,0 +1,18 @@
+Biuret PrayerPal - third-party components
+
+This portable application includes Python, PySide6/Qt, shiboken6, tzdata, and
+PyInstaller's bootloader. The relevant installed distribution metadata and
+license files are bundled with the application. Runtime DLL and media-codec
+licenses also apply. Qt's native Windows media backend uses Windows components.
+
+Python: https://docs.python.org/3/license.html
+Qt / PySide: https://doc.qt.io/qtforpython-6/licenses.html
+PyInstaller bootloader exception: https://pyinstaller.org/en/stable/license.html
+tzdata: https://github.com/python/tzdata
+
+The owner-supplied Adhan recording by Omar Hisham Al Arabi is included.
+See assets/sounds/README.md for attribution and provenance. The recording
+is separate from the application code and remains subject to its own rights.
+Custom Azkar recordings are not included.
+
+Review the full dependency license obligations before public distribution.
