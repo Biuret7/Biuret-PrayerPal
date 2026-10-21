@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 
 def run_smoke(report_file: str) -> int:
-    from PySide6.QtCore import QSettings, QTimer
+    from PySide6.QtCore import QSettings, QTimer, Qt
     from PySide6.QtMultimedia import QMediaPlayer
     from PySide6.QtWidgets import QApplication
     from .core import Config, calculate_day
@@ -74,7 +74,30 @@ def run_smoke(report_file: str) -> int:
         dialog.preview_requested.connect(lambda prefs, kind: previews.append(prefs))
         dialog.test_button.click()
         results['checks']['settings_preview'] = len(previews) == 1
+        dialog.duration_increase.click()
+        dialog.test_button.click()
+        results['checks']['duration_stepper_preview'] = (
+            dialog.duration.value() == 9 and len(previews) == 2
+            and previews[-1].duration_seconds == 9)
         dialog.deleteLater()
+        window._toggle_language()
+        english = SettingsDialog(config, window.prefs, window)
+        english.show()
+        english.tabs.setCurrentIndex(1)
+        app.processEvents()
+        results['checks']['english_interface'] = (
+            window.layoutDirection() == Qt.LayoutDirection.LeftToRight
+            and english.tabs.tabText(5) == 'App'
+            and english.start_on_login.text().startswith('Start PrayerPal')
+            and window.sunrise.text().startswith('Sunrise today:'))
+        results['checks']['english_numeric_editor_visible_width'] = (
+            bool(english.fajr.lineEdit().text())
+            and english.fajr.lineEdit().width() >= english.fajr.width() * 0.8)
+        english.hide()
+        english.deleteLater()
+        window._toggle_theme()
+        results['checks']['theme_animation_started'] = (
+            window.theme._theme_animation.state() == window.theme._theme_animation.State.Running)
         sound = SoundService()
         sound.output.setMuted(True)
         sound.error_message.connect(lambda message: finish(False, message))

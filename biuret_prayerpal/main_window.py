@@ -3,19 +3,20 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 from datetime import datetime, timedelta
-from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtCore import Qt, QSettings, QTimer, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox,
-    QSystemTrayIcon, QVBoxLayout, QWidget,
+    QSystemTrayIcon, QVBoxLayout, QWidget, QStackedWidget, QGraphicsOpacityEffect,
 )
-from .core import (PRAYERS, AR_NAMES, calculate_day, countdown_text,
-                   next_and_previous, time_text)
+from .core import PRAYERS, calculate_day, countdown_text, next_and_previous
 from .preferences import ReminderPrefs
 from .reminders import due_reminders, list_reminders, prune_sent
 from .storage import load_core, load_reminders, save_preferences, load_sent, save_sent
 from .popup import PopupManager
-from .theme import style, HoverButton
+from .theme import style, HoverButton, ThemeButton
+from .i18n import tr, error_text, translate_tree, display_time, prayer_name
+from .startup import WindowsStartup, commit_preferences
 from .dialogs import SettingsDialog
 from .resources import resource_path
 
@@ -44,12 +45,14 @@ def app_icon() -> QIcon:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, settings=None, *, enable_tray=True):
+    def __init__(self, settings=None, *, enable_tray=True, startup=None):
         super().__init__()
         # Reuse v3 registry keys to retain prior saved location and offsets.
         self.settings = settings if settings is not None else QSettings('MyApps', 'PrayerReminder')
         self.conf = load_core(self.settings)
         self.prefs = load_reminders(self.settings)
+        self.startup = startup if startup is not None else WindowsStartup()
+        self._theme_overlay = None
         self.day_loaded = None
         self.schedules = {}
         self.events = []
@@ -58,14 +61,15 @@ class MainWindow(QMainWindow):
         self.last_error = ''
         self.setWindowTitle('Biuret PrayerPal | مواقيت الصلاة')
         self.setWindowIcon(app_icon())
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft if self.prefs.language == 'ar'
+                                else Qt.LayoutDirection.LeftToRight)
         self.resize(480, 670)
         self.setMinimumSize(440, 610)
         self._build_ui()
         self._build_tray(enable_tray)
         self.popups = PopupManager(self.tray if self.tray_available else None, self)
         self.popups.feedback.connect(self._notice)
-        self.popups.sound.active_changed.connect(self.stop_audio_button.setEnabled)
+        self.popups.sound.active_changed.connect(self._audio_state_changed)
         self._apply_theme()
         self._refresh()
         self.clock = QTimer(self)
@@ -105,12 +109,17 @@ class MainWindow(QMainWindow):
         refresh.setAccessibleName('تحديث المواقيت')
         refresh.clicked.connect(lambda: self._refresh(True))
         header.addWidget(refresh)
-        self.theme = HoverButton('☀')
+        self.theme = ThemeButton()
         self.theme.setObjectName('tiny')
         self.theme.setToolTip('الوضع الداكن/الفاتح')
         self.theme.setAccessibleName('تبديل المظهر الداكن والفاتح')
         self.theme.clicked.connect(self._toggle_theme)
         header.addWidget(self.theme)
+        self.language_button = HoverButton('EN' if self.prefs.language == 'ar' else 'AR')
+        self.language_button.setFixedWidth(44)
+        self.language_button.setToolTip('English' if self.prefs.language == 'ar' else 'العربية')
+        self.language_button.clicked.connect(self._toggle_language)
+        header.addWidget(self.language_button)
         layout.addLayout(header)
 
         hero = QFrame()
@@ -139,19 +148,28 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         row.addWidget(self._label('مواقيت اليوم', 'heading'))
         row.addStretch()
-        self.stop_audio_button = HoverButton('إيقاف الصوت')
-        self.stop_audio_button.setEnabled(False)
-        self.stop_audio_button.setToolTip('إيقاف التسجيل حتى بعد اختفاء الإشعار')
-        self.stop_audio_button.clicked.connect(self._stop_audio)
-        row.addWidget(self.stop_audio_button)
-        self.sunrise = self._label('الشروق --:--', 'caption')
-        row.addWidget(self.sunrise)
+        self.current_prayer = self._label('', 'caption')
+        row.addWidget(self.current_prayer)
         layout.addLayout(row)
         box = QFrame()
         box.setObjectName('times')
         times_layout = QVBoxLayout(box)
         times_layout.setContentsMargins(8, 6, 8, 6)
         times_layout.setSpacing(1)
+        self.audio_stack = QStackedWidget()
+        self.audio_stack.setFixedWidth(145)
+        self.audio_stack.setFixedHeight(42)
+        self.audio_idle = self._label('الصوت متوقف', 'caption')
+        self.audio_idle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.audio_idle.setToolTip('يظهر زر إيقاف الصوت أثناء تشغيل تسجيل فقط.')
+        self.audio_stack.addWidget(self.audio_idle)
+        self.stop_audio_button = HoverButton('إيقاف الصوت')
+        self.stop_audio_button.setEnabled(False)
+        self.stop_audio_button.setToolTip('إيقاف التسجيل حتى بعد اختفاء الإشعار')
+        self.stop_audio_button.clicked.connect(self._stop_audio)
+        self.audio_stack.addWidget(self.stop_audio_button)
+        self.sunrise = self._label('الشروق --:--', 'caption')
+        self.sunrise.setToolTip('الشروق معلومة فلكية لليوم، وليس الصلاة الحالية أو القادمة.')
         self.rows = {}
         for name, arabic in PRAYERS:
             item = QFrame()
@@ -169,6 +187,11 @@ class MainWindow(QMainWindow):
             times_layout.addWidget(item)
             self.rows[name] = (item, value)
         layout.addWidget(box)
+        details = QHBoxLayout()
+        details.addWidget(self.sunrise)
+        details.addStretch()
+        details.addWidget(self.audio_stack)
+        layout.addLayout(details)
 
         buttons = QHBoxLayout()
         buttons.setSpacing(7)
@@ -188,12 +211,14 @@ class MainWindow(QMainWindow):
         self.status.setMinimumHeight(34)
         layout.addWidget(self.status)
         layout.addStretch(0)
+        translate_tree(self.centralWidget(), self.prefs.language)
+        self.setWindowTitle(tr('Biuret PrayerPal | مواقيت الصلاة', self.prefs.language))
 
     def _build_tray(self, enabled=True):
         self.tray_available = enabled and QSystemTrayIcon.isSystemTrayAvailable()
         self.tray = QSystemTrayIcon(app_icon(), self)
         menu = QMenu(self)
-        menu.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        menu.setLayoutDirection(self.layoutDirection())
         actions = (
             ('فتح البرنامج', self._show_window),
             ('الإعدادات', self._open_settings),
@@ -205,7 +230,7 @@ class MainWindow(QMainWindow):
         for i, (title, handler) in enumerate(actions):
             if i == len(actions) - 1:
                 menu.addSeparator()
-            action = QAction(title, self)
+            action = QAction(tr(title, self.prefs.language), self)
             action.triggered.connect(handler)
             menu.addAction(action)
         self.tray.setContextMenu(menu)
@@ -213,17 +238,18 @@ class MainWindow(QMainWindow):
         if self.tray_available:
             self.tray.show()
 
-    def _apply_theme(self):
+    def _apply_theme(self, animate=False):
         self.setProperty('darkTheme', self.conf.dark)
         self.setProperty('reducedMotion', self.prefs.reduced_motion)
         self.setStyleSheet(style(self.conf.dark))
-        self.theme.setText('☀' if self.conf.dark else '☾')
-        self.theme.setProperty('symbol', 'sun' if self.conf.dark else 'moon')
+        self.theme.set_dark(self.conf.dark, animate=animate)
         for widget, _ in self.rows.values():
             widget.style().unpolish(widget)
             widget.style().polish(widget)
 
     def _notice(self, message: str, error: bool = True):
+        message = error_text(message, self.prefs.language) if error else tr(
+            message, self.prefs.language)
         self.status.setText(message)
         self.status.setToolTip(message)
         self.status.setStyleSheet('color:#FF9D9D;' if error else '')
@@ -238,7 +264,73 @@ class MainWindow(QMainWindow):
             self._notice(str(error))
             return
         self.conf = new_conf
+        snapshot = self.centralWidget().grab() if not self.prefs.reduced_motion else None
+        if self._theme_overlay is not None:
+            self._theme_overlay.hide()
+            self._theme_overlay.deleteLater()
+            self._theme_overlay = None
+        self._apply_theme(animate=True)
+        if snapshot is not None and self.isVisible():
+            overlay = QLabel(self.centralWidget())
+            overlay.setPixmap(snapshot)
+            overlay.setGeometry(self.centralWidget().rect())
+            overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            effect = QGraphicsOpacityEffect(overlay)
+            overlay.setGraphicsEffect(effect)
+            fade = QPropertyAnimation(effect, b'opacity', overlay)
+            fade.setDuration(220)
+            fade.setStartValue(1.0)
+            fade.setEndValue(0.0)
+            fade.setEasingCurve(QEasingCurve.Type.OutCubic)
+            fade.finished.connect(overlay.deleteLater)
+            overlay.destroyed.connect(lambda: self._clear_theme_overlay(overlay))
+            overlay.show()
+            overlay.raise_()
+            self._theme_overlay = overlay
+            fade.start()
+
+    def _clear_theme_overlay(self, overlay):
+        if self._theme_overlay is overlay:
+            self._theme_overlay = None
+
+    def resizeEvent(self, event):
+        if self._theme_overlay is not None:
+            self._theme_overlay.hide()
+            self._theme_overlay.deleteLater()
+            self._theme_overlay = None
+        super().resizeEvent(event)
+
+    def _toggle_language(self):
+        new_prefs = replace(self.prefs, language='en' if self.prefs.language == 'ar' else 'ar')
+        try:
+            save_preferences(self.settings, self.conf, new_prefs)
+        except OSError as error:
+            self._notice(str(error))
+            return
+        self.prefs = new_prefs
+        self._rebuild_presentation()
+        self._refresh()
+
+    def _rebuild_presentation(self):
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft if self.prefs.language == 'ar'
+                                else Qt.LayoutDirection.LeftToRight)
+        if self._theme_overlay is not None:
+            self._theme_overlay.hide()
+            self._theme_overlay.deleteLater()
+            self._theme_overlay = None
+        self._build_ui()
+        menu = self.tray.contextMenu()
+        for action, title in zip((a for a in menu.actions() if not a.isSeparator()),
+                                 ('فتح البرنامج', 'الإعدادات', 'اختبار التذكير',
+                                  'تحديث المواقيت', 'إيقاف الصوت', 'خروج نهائي')):
+            action.setText(tr(title, self.prefs.language))
+        menu.setLayoutDirection(self.layoutDirection())
         self._apply_theme()
+        self._audio_state_changed(self.popups.sound.is_active)
+
+    def _audio_state_changed(self, active):
+        self.stop_audio_button.setEnabled(active)
+        self.audio_stack.setCurrentIndex(1 if active else 0)
 
     def _refresh(self, manual=False):
         try:
@@ -255,15 +347,18 @@ class MainWindow(QMainWindow):
             LOG.exception('Prayer calculation error')
             self.events = list_reminders([], self.prefs, self.conf.zone, days=[now.date()])
             self.schedules = {}
-            self.next_name.setText('تعذّر الحساب')
+            self.next_name.setText(tr('تعذّر الحساب', self.prefs.language))
             self.countdown.setText('--:--:--')
-            self.next_hint.setText('راجع الإعدادات')
+            self.next_hint.setText(tr('راجع الإعدادات', self.prefs.language))
+            self.sunrise.setText('—')
+            self.current_prayer.setText('—')
             for widget, value in self.rows.values():
                 value.setText('--:--')
                 self._highlight(widget, False)
             self._notice('خطأ في حساب المواقيت — اضغط تحديث للتفاصيل')
             if manual:
-                QMessageBox.warning(self, 'تعذّر حساب المواقيت', self.last_error)
+                QMessageBox.warning(self, tr('تعذّر حساب المواقيت', self.prefs.language),
+                                    error_text(self.last_error, self.prefs.language))
             return
         self._notice('تم تحديث المواقيت' if manual else 'حساب محلي • لا يحتاج إنترنت', False)
         self._tick()
@@ -281,28 +376,35 @@ class MainWindow(QMainWindow):
         if self.day_loaded != now.date():
             self._refresh()
             return
-        self.city_label.setText(f'{self.conf.city}  •  {now:%d/%m/%Y}')
+        language = self.prefs.language
+        self.city_label.setText(f'{tr(self.conf.city, language)}  •  {now:%d/%m/%Y}')
         self._deliver_reminders(now)
         if not self.schedules:
             return
         today = self.schedules[0]
-        self.sunrise.setText('الشروق ' + time_text(today.sunrise, self.conf.time_24))
+        self.sunrise.setText(tr('الشروق اليوم: {time}', language,
+                                time=display_time(today.sunrise, self.conf.time_24, language)))
         previous, upcoming = next_and_previous(now, [self.schedules[i] for i in (-1, 0, 1)])
+        current = tr('الصلاة الحالية: {prayer}', language,
+                     prayer=prayer_name(previous[0], language)) if previous else ''
+        self.current_prayer.setText(current)
         for name, (frame, value) in self.rows.items():
-            value.setText(time_text(today.times[name], self.conf.time_24))
+            value.setText(display_time(today.times[name], self.conf.time_24, language))
             self._highlight(frame, bool(upcoming and upcoming[0] == name
                                         and upcoming[1] == today.times[name]))
         if upcoming:
             prayer, instant = upcoming
-            self.next_name.setText(AR_NAMES[prayer])
+            self.next_name.setText(prayer_name(prayer, language))
             self.countdown.setText(countdown_text(now, instant))
             day_text = 'غداً' if instant.astimezone(
                 self.conf.zone).date() != today.day else 'اليوم'
-            self.next_hint.setText(f'{day_text}  •  {time_text(instant, self.conf.time_24)}')
+            self.next_hint.setText(f'{tr(day_text, language)}  •  '
+                                   f'{display_time(instant, self.conf.time_24, language)}')
             if self.tray_available:
-                self.tray.setToolTip(f'Biuret PrayerPal • {AR_NAMES[prayer]} {day_text}')
+                self.tray.setToolTip(f'Biuret PrayerPal • {prayer_name(prayer, language)} '
+                                     f'{tr(day_text, language)}')
         else:
-            self.next_name.setText('لا توجد صلاة قادمة')
+            self.next_name.setText(tr('لا توجد صلاة قادمة', language))
             self.countdown.setText('--:--:--')
 
     def _deliver_reminders(self, now):
@@ -326,7 +428,8 @@ class MainWindow(QMainWindow):
             title, body = 'أذكار الصباح • تجربة', 'خذ لحظة للذكر والاستغفار. هذا إشعار تجريبي.'
         else:
             title, body = 'حان وقت الصلاة • تجربة', 'حان وقت صلاة الظهر. هذا إشعار تجريبي.'
-        self.popups.notify(title, body, kind, prefs, preview=True)
+        self.popups.notify(tr(title, prefs.language), tr(
+            body, prefs.language), kind, prefs, preview=True)
 
     def _open_settings(self):
         if self._settings_dialog is not None:
@@ -335,9 +438,15 @@ class MainWindow(QMainWindow):
             return
 
         def commit(conf, prefs):
-            save_preferences(self.settings, conf, prefs)
+            commit_preferences(self.settings, conf, prefs, self.startup)
 
-        dialog = SettingsDialog(self.conf, self.prefs, self, commit=commit)
+        try:
+            enabled = self.startup.enabled()
+        except OSError as error:
+            self._notice(str(error))
+            return
+        dialog = SettingsDialog(self.conf, self.prefs, self,
+                                commit=commit, startup_enabled=enabled)
         self._settings_dialog = dialog
         dialog.preview_requested.connect(self._test_notification)
         try:
@@ -352,7 +461,7 @@ class MainWindow(QMainWindow):
             return
         self.conf, self.prefs = new_conf, new_prefs
         self.popups.cancel_pending()
-        self._apply_theme()
+        self._rebuild_presentation()
         self._refresh()
 
     def _activated(self, reason):
@@ -372,8 +481,9 @@ class MainWindow(QMainWindow):
             self.hide()
         else:
             QMessageBox.information(
-                self, 'العمل بالخلفية',
-                'أيقونة شريط النظام غير متاحة حالياً، اترك النافذة مفتوحة للتذكيرات.',
+                self, tr('العمل بالخلفية', self.prefs.language),
+                tr('أيقونة شريط النظام غير متاحة حالياً، اترك النافذة مفتوحة للتذكيرات.',
+                   self.prefs.language),
             )
 
     def closeEvent(self, event):

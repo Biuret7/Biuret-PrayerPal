@@ -55,13 +55,14 @@ def style(dark: bool) -> str:
         font-size:16px; font-weight:600; }}
     QPushButton {{ border:1px solid {c['stroke']}; border-radius:10px; background:{c['button']};
         min-height:24px; padding:7px 12px; font-weight:600; }}
-    QPushButton:hover, QPushButton:focus {{ border-color:{c['cyan']}; }}
+    QPushButton:hover {{ border-color:{c['cyan']}; }}
     QPushButton:pressed {{ background:{c['row']}; }}
     QPushButton:disabled {{ color:{c['muted']}; background:{c['card']}; }}
     QPushButton#primary {{ background:{c['emerald']}; color:{c['primary_text']}; }}
     QPushButton#tiny {{ min-width:32px; max-width:32px; min-height:30px; padding:4px; }}
     QTabWidget::pane {{ border:1px solid {c['stroke']}; background:{c['card']};
-        border-radius:14px; }}
+        border-radius:14px; padding:5px; }}
+    QTabWidget > QStackedWidget {{ background:transparent; border:none; }}
     QTabBar::tab {{ padding:10px 14px; background:{c['button']}; border:1px solid transparent;
         border-radius:8px; margin:3px 2px; }}
     QTabBar::tab:hover {{ color:{c['cyan']}; }}
@@ -90,7 +91,16 @@ def style(dark: bool) -> str:
         border-radius:9px; width:14px; margin:-6px 0; }}
     QSlider::handle:horizontal:hover {{ background:{c['gold']}; }}
     QScrollArea {{ border:none; background:transparent; }}
-    QScrollArea > QWidget > QWidget {{ background:{c['card']}; }}
+    QScrollArea > QWidget, QScrollArea > QWidget > QWidget {{ background:transparent; }}
+    QAbstractSpinBox QLineEdit {{ border:none; background:transparent; padding:0;
+        min-height:0; }}
+    QSpinBox::up-button, QSpinBox::down-button,
+    QDoubleSpinBox::up-button, QDoubleSpinBox::down-button,
+    QTimeEdit::up-button, QTimeEdit::down-button {{ width:0px; border:none;
+        background:transparent; }}
+    QSpinBox::up-arrow, QSpinBox::down-arrow,
+    QDoubleSpinBox::up-arrow, QDoubleSpinBox::down-arrow,
+    QTimeEdit::up-arrow, QTimeEdit::down-arrow {{ image:none; }}
     QScrollBar:vertical {{ width:8px; background:{c['card']}; margin:3px; }}
     QScrollBar::handle:vertical {{ background:{c['stroke']}; border-radius:3px; min-height:28px; }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
@@ -130,6 +140,7 @@ class HoverButton(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._progress = 0.0
         self._scale = 1.0
+        self._keyboard_focus = False
         self._hover = QPropertyAnimation(self, b'hoverProgress', self)
         self._press = QPropertyAnimation(self, b'pressScale', self)
         for animation in (self._hover, self._press):
@@ -163,16 +174,35 @@ class HoverButton(QPushButton):
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self._animate(self._hover, self._progress, 1.0 if self.hasFocus() else 0.0)
+        self._animate(self._hover, self._progress,
+                      1.0 if self.hasFocus() and self._keyboard_focus else 0.0)
         super().leaveEvent(event)
 
     def focusInEvent(self, event):
-        self._animate(self._hover, self._progress, 1.0)
+        if event.reason() in (Qt.FocusReason.TabFocusReason, Qt.FocusReason.BacktabFocusReason,
+                              Qt.FocusReason.ShortcutFocusReason, Qt.FocusReason.OtherFocusReason):
+            self._keyboard_focus = True
+        elif event.reason() == Qt.FocusReason.MouseFocusReason:
+            self._keyboard_focus = False
+        self._animate(self._hover, self._progress,
+                      1.0 if self._keyboard_focus or self.underMouse() else 0.0)
         super().focusInEvent(event)
 
     def focusOutEvent(self, event):
         self._animate(self._hover, self._progress, 1.0 if self.underMouse() else 0.0)
         super().focusOutEvent(event)
+
+    def mousePressEvent(self, event):
+        self._keyboard_focus = False
+        self.update()
+        super().mousePressEvent(event)
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.Type.EnabledChange and not self.isEnabled():
+            self._press.stop()
+            self._scale = 1.0
+            self.update()
+        super().changeEvent(event)
 
     def paintEvent(self, event):
         c = _palette(self)
@@ -186,7 +216,7 @@ class HoverButton(QPushButton):
         painter.setBrush(_mix(c['emerald'] if primary else c['button'],
                               c['cyan'] if primary else c['card_alt'], progress))
         painter.setPen(QPen(_mix(c['emerald'] if primary else c['stroke'], c['cyan'], progress),
-                            2 if self.hasFocus() else 1))
+                            2 if self.hasFocus() and self._keyboard_focus else 1))
         painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 10, 10)
         painter.setPen(QColor(c['primary_text'] if primary else c['fg'])
                        if self.isEnabled() else QColor(c['muted']))
@@ -219,6 +249,46 @@ class HoverButton(QPushButton):
             painter.drawLine(center + QPointF(5, 0), center + QPointF(0, -1))
 
 
+class ThemeButton(HoverButton):
+    """Paint-only sun/moon rotation and crossfade; hit area never moves."""
+
+    def __init__(self, parent=None):
+        super().__init__('', parent)
+        self._theme_progress = 1.0
+        self._theme_animation = QPropertyAnimation(self, b'themeProgress', self)
+        self._theme_animation.setDuration(280)
+        self._theme_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.setProperty('symbol', 'sun')
+
+    def _set_theme_progress(self, value):
+        self._theme_progress = value
+        self.update()
+
+    themeProgress = Property(float, lambda self: self._theme_progress, _set_theme_progress)
+
+    def set_dark(self, dark, animate=False):
+        target = 1.0 if dark else 0.0
+        self.setProperty('symbol', 'sun' if dark else 'moon')
+        self._theme_animation.stop()
+        if not animate or self.window().property('reducedMotion'):
+            self._set_theme_progress(target)
+        else:
+            self._theme_animation.setStartValue(self._theme_progress)
+            self._theme_animation.setEndValue(target)
+            self._theme_animation.start()
+
+    def _paint_symbol(self, painter, symbol):
+        painter.save()
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(100 * (1 - self._theme_progress))
+        painter.translate(-self.width() / 2, -self.height() / 2)
+        painter.setOpacity(1 - self._theme_progress)
+        super()._paint_symbol(painter, 'moon')
+        painter.setOpacity(self._theme_progress)
+        super()._paint_symbol(painter, 'sun')
+        painter.restore()
+
+
 class _InteractionRing(QWidget):
     """Transparent, paint-only child; never changes input geometry or event delivery."""
 
@@ -228,6 +298,7 @@ class _InteractionRing(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._strength = 0.0
+        self._keyboard_focus = False
         self.animation = QPropertyAnimation(self, b'strength', self)
         self.animation.setDuration(160)
         control.installEventFilter(self)
@@ -245,7 +316,12 @@ class _InteractionRing(QWidget):
             self.setGeometry(control.rect())
         if event.type() in (QEvent.Type.Enter, QEvent.Type.Leave, QEvent.Type.FocusIn,
                             QEvent.Type.FocusOut, QEvent.Type.EnabledChange):
-            target = (1.0 if control.hasFocus() else 0.45 if control.underMouse() else 0.0)
+            if event.type() == QEvent.Type.FocusIn:
+                self._keyboard_focus = event.reason() in (
+                    Qt.FocusReason.TabFocusReason, Qt.FocusReason.BacktabFocusReason,
+                    Qt.FocusReason.ShortcutFocusReason, Qt.FocusReason.OtherFocusReason)
+            focused = control.hasFocus() and self._keyboard_focus
+            target = (1.0 if focused else 0.45 if control.underMouse() else 0.0)
             if not control.isEnabled():
                 target = 0.0
             self.animation.stop()

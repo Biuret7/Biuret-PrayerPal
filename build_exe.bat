@@ -10,7 +10,7 @@ if errorlevel 1 goto :failed
 ".venv-build\Scripts\python.exe" build.py %*
 if errorlevel 1 goto :failed
 echo.
-echo Build complete: release\BiuretPrayerPal.exe
+echo Build complete: see the versioned Windows-x64 EXE and metadata in release\.
 pause
 exit /b 0
 :failed

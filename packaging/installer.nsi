@@ -9,13 +9,27 @@ Unicode true
 !ifndef APP_VERSION
   !error "Use build_installer.py to supply validated build inputs."
 !endif
-!define PRODUCT_ID "Biuret.PrayerPal.Windows"
-!define INSTALL_KEY "Software\Biuret\PrayerPalInstaller"
-!define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\BiuretPrayerPal"
+; The validation build changes only OS registration identity, never install logic.
+; It stays under artifacts/ and must never be distributed as the application.
+!ifdef VALIDATION_BUILD
+  !define PRODUCT_ID "Biuret.PrayerPal.Validation101"
+  !define INSTALL_KEY "Software\Biuret\PrayerPalInstallerValidation101"
+  !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\BiuretPrayerPalValidation101"
+  !define SHORTCUT_NAME "Biuret PrayerPal validation 1.0.1"
+  !define STARTUP_VALUE "BiuretPrayerPalValidation101"
+  !define SETUP_MUTEX "Local\BiuretPrayerPalSetupValidation101"
+!else
+  !define PRODUCT_ID "Biuret.PrayerPal.Windows"
+  !define INSTALL_KEY "Software\Biuret\PrayerPalInstaller"
+  !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\BiuretPrayerPal"
+  !define SHORTCUT_NAME "Biuret PrayerPal"
+  !define STARTUP_VALUE "BiuretPrayerPal"
+  !define SETUP_MUTEX "Local\BiuretPrayerPalSetup"
+!endif
 
 Name "Biuret PrayerPal"
 OutFile "${OUTPUT_EXE}"
-InstallDir "$LOCALAPPDATA\Programs\Biuret PrayerPal"
+InstallDir "$LOCALAPPDATA\Programs\${SHORTCUT_NAME}"
 InstallDirRegKey HKCU "${INSTALL_KEY}" "InstallDir"
 RequestExecutionLevel user
 ManifestDPIAware true
@@ -76,7 +90,7 @@ Function ${PREFIX}.onInit
     SetErrorLevel 2
     Quit
   ${EndIf}
-  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Local\BiuretPrayerPalSetup") p .r0 ?e'
+  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "${SETUP_MUTEX}") p .r0 ?e'
   Pop $1
   StrCpy $SetupMutex $0
   ${If} $0 P= 0
@@ -178,7 +192,7 @@ Section "$(CoreName)" MainSection
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     IfErrors install_failed
     WriteRegStr HKCU "${INSTALL_KEY}" "InstallDir" "$INSTDIR"
-    WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "Biuret PrayerPal"
+    WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "${SHORTCUT_NAME}"
     WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
     WriteRegStr HKCU "${UNINSTALL_KEY}" "Publisher" "Biuret"
     WriteRegStr HKCU "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
@@ -189,7 +203,7 @@ Section "$(CoreName)" MainSection
     WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
     WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
     WriteRegDWORD HKCU "${UNINSTALL_KEY}" "EstimatedSize" ${INSTALL_SIZE_KB}
-    CreateShortcut "$SMPROGRAMS\Biuret PrayerPal.lnk" "$INSTDIR\BiuretPrayerPal.exe"
+    CreateShortcut "$SMPROGRAMS\${SHORTCUT_NAME}.lnk" "$INSTDIR\BiuretPrayerPal.exe"
     IfErrors install_failed
     Delete "$INSTDIR\BiuretPrayerPal.exe.previous"
     Goto install_done
@@ -205,7 +219,7 @@ Section "$(CoreName)" MainSection
 SectionEnd
 
 Section /o "$(DesktopName)" DesktopSection
-  CreateShortcut "$DESKTOP\Biuret PrayerPal.lnk" "$INSTDIR\BiuretPrayerPal.exe"
+  CreateShortcut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$INSTDIR\BiuretPrayerPal.exe"
 SectionEnd
 
 Section "Uninstall"
@@ -227,8 +241,13 @@ Section "Uninstall"
   Delete "$INSTDIR\BiuretPrayerPal.exe.previous"
   Delete "$INSTDIR\BiuretPrayerPal.install.ini"
   Delete "$INSTDIR\Uninstall.exe"
-  Delete "$SMPROGRAMS\Biuret PrayerPal.lnk"
-  Delete "$DESKTOP\Biuret PrayerPal.lnk"
+  Delete "$SMPROGRAMS\${SHORTCUT_NAME}.lnk"
+  Delete "$DESKTOP\${SHORTCUT_NAME}.lnk"
+  ; Remove only a startup command owned by this exact installed executable.
+  ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${STARTUP_VALUE}"
+  ${If} $0 == '$\"$INSTDIR\BiuretPrayerPal.exe$\" --startup'
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${STARTUP_VALUE}"
+  ${EndIf}
   DeleteRegKey HKCU "${UNINSTALL_KEY}"
   DeleteRegKey HKCU "${INSTALL_KEY}"
   RMDir "$INSTDIR"

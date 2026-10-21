@@ -2,8 +2,9 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from .core import AR_NAMES, Schedule, UTC
+from .core import Schedule, UTC
 from .preferences import ReminderPrefs
+from .i18n import tr, prayer_name
 
 
 @dataclass(frozen=True)
@@ -40,13 +41,15 @@ def list_reminders(schedules: list[Schedule], prefs: ReminderPrefs, zone,
             if instant.tzinfo is None:
                 raise ValueError('Prayer times must contain timezone')
             result.append(ReminderEvent(
-                f'{day}:{prayer}:prayer', 'حان وقت الصلاة',
-                f'حان الآن وقت صلاة {AR_NAMES[prayer]}. تقبّل الله طاعتكم.',
+                f'{day}:{prayer}:prayer', tr('حان وقت الصلاة', prefs.language),
+                tr('حان الآن وقت صلاة {prayer}. تقبّل الله طاعتكم.', prefs.language,
+                   prayer=prayer_name(prayer, prefs.language)),
                 'prayer', instant))
             if prefs.early_minutes:
                 result.append(ReminderEvent(
-                    f'{day}:{prayer}:early', 'اقترب وقت الصلاة',
-                    f'تبقى {prefs.early_minutes} دقائق على صلاة {AR_NAMES[prayer]}.',
+                    f'{day}:{prayer}:early', tr('اقترب وقت الصلاة', prefs.language),
+                    tr('تبقى {minutes} دقائق على صلاة {prayer}.', prefs.language,
+                       minutes=prefs.early_minutes, prayer=prayer_name(prayer, prefs.language)),
                     'early', (instant.astimezone(UTC) - timedelta(
                         minutes=prefs.early_minutes)).astimezone(zone)))
     azkar_days = {schedule.day for schedule in schedules} | set(days or [])
@@ -54,13 +57,13 @@ def list_reminders(schedules: list[Schedule], prefs: ReminderPrefs, zone,
         day = azkar_day.isoformat()
         if prefs.morning_azkar:
             result.append(ReminderEvent(
-                f'{day}:azkar:morning', 'أذكار الصباح',
-                'لحظات من الذكر والاستغفار لبداية يومك.', 'azkar',
+                f'{day}:azkar:morning', tr('أذكار الصباح', prefs.language),
+                tr('لحظات من الذكر والاستغفار لبداية يومك.', prefs.language), 'azkar',
                 _azkar_instant(azkar_day, prefs.morning_time, zone)))
         if prefs.evening_azkar:
             result.append(ReminderEvent(
-                f'{day}:azkar:evening', 'أذكار المساء',
-                'خصص دقائق لأذكار المساء والطمأنينة.', 'azkar',
+                f'{day}:azkar:evening', tr('أذكار المساء', prefs.language),
+                tr('خصص دقائق لأذكار المساء والطمأنينة.', prefs.language), 'azkar',
                 _azkar_instant(azkar_day, prefs.evening_time, zone)))
     unique = {event.identity: event for event in result}
     return sorted(unique.values(), key=lambda r: r.when.astimezone(UTC))

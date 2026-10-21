@@ -6,20 +6,24 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QDialog, QDoubleSpinBox, QFileDialog,
     QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QSlider, QSpinBox,
-    QTabWidget, QTimeEdit, QVBoxLayout, QWidget, QScrollArea,
+    QTabWidget, QTimeEdit, QVBoxLayout, QWidget, QScrollArea, QAbstractSpinBox,
 )
 from .core import Config, CITIES, PRAYERS, calculate_day
 from .preferences import (ReminderPrefs, POSITIONS, ANIMATIONS, SOUND_MODES, BORDERS)
 from .theme import style, HoverButton, install_interactions
+from .i18n import tr, error_text, translate_tree
 
 
 class SettingsDialog(QDialog):
     preview_requested = Signal(object, str)
 
-    def __init__(self, conf: Config, prefs: ReminderPrefs, parent=None, commit=None):
+    def __init__(self, conf: Config, prefs: ReminderPrefs, parent=None, commit=None,
+                 *, startup_enabled=None):
         super().__init__(parent)
         self.setWindowTitle('إعدادات Biuret PrayerPal')
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.language = prefs.language
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft if self.language == 'ar'
+                                else Qt.LayoutDirection.LeftToRight)
         self.resize(680, 720)
         self.setMinimumSize(540, 430)
         self.setProperty('darkTheme', conf.dark)
@@ -47,6 +51,7 @@ class SettingsDialog(QDialog):
         self._build_reminders(prefs)
         self._build_sound(prefs)
         self._build_popup(prefs)
+        self._build_general(prefs, startup_enabled)
         footer = QHBoxLayout()
         footer.setSpacing(8)
         save = HoverButton('حفظ التغييرات')
@@ -63,6 +68,13 @@ class SettingsDialog(QDialog):
         footer.addWidget(self.test_button)
         layout.addLayout(footer)
         self.setStyleSheet(style(conf.dark))
+        translate_tree(self, self.language)
+        for control in self.findChildren(QAbstractSpinBox):
+            # Qt 6.12's QSS/NoButtons path gives LTR editors a one-pixel width.
+            # Keep the native symbols mode; QSS gives both arrow controls zero
+            # width instead. Keyboard/wheel stepping and the full editor survive.
+            control.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
+            control.lineEdit().setTextMargins(6, 0, 6, 0)
         self._fade = QPropertyAnimation(self, b'windowOpacity', self)
         self._fade.setDuration(230)
         self._fade.setStartValue(0.0)
@@ -105,6 +117,11 @@ class SettingsDialog(QDialog):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         scroll.setWidget(tab)
+        # setWidget enables autoFillBackground; reset it so rectangular pages
+        # cannot paint over the rounded pane, including its four corners.
+        tab.setAutoFillBackground(False)
+        scroll.viewport().setAutoFillBackground(False)
+        scroll.setAutoFillBackground(False)
         self.tabs.addTab(scroll, name)
         form = QFormLayout(tab)
         form.setContentsMargins(18, 17, 18, 12)
@@ -116,7 +133,8 @@ class SettingsDialog(QDialog):
         form = self._tab('الموقع')
         self.city = QComboBox()
         self.city.setEditable(True)
-        self.city.addItems([*CITIES, 'مخصص'])
+        for city in [*CITIES, 'مخصص']:
+            self.city.addItem(city, city)
         self.city.setCurrentText(conf.city)
         self.lat = QDoubleSpinBox()
         self.lat.setRange(-90, 90)
@@ -145,7 +163,14 @@ class SettingsDialog(QDialog):
         self.lat.valueChanged.connect(self._coordinate_changed)
         self.lon.valueChanged.connect(self._coordinate_changed)
 
-    def _city_changed(self, city):
+    def _city_value(self):
+        index = self.city.currentIndex()
+        if index >= 0 and self.city.currentText() == self.city.itemText(index):
+            return self.city.itemData(index)
+        return self.city.currentText()
+
+    def _city_changed(self, _text):
+        city = self._city_value()
         if city in CITIES:
             lat, lon = CITIES[city]
             for field, value in ((self.lat, lat), (self.lon, lon)):
@@ -154,9 +179,9 @@ class SettingsDialog(QDialog):
                 field.blockSignals(False)
 
     def _coordinate_changed(self, _value):
-        if self.city.currentText() in CITIES:
+        if self._city_value() in CITIES:
             self.city.blockSignals(True)
-            self.city.setCurrentText('مخصص')
+            self.city.setCurrentIndex(self.city.findData('مخصص'))
             self.city.blockSignals(False)
 
     def _build_calculation(self, conf):
@@ -213,7 +238,30 @@ class SettingsDialog(QDialog):
         self.duration.setRange(4, 30)
         self.duration.setSuffix(' ثانية')
         self.duration.setValue(prefs.duration_seconds)
-        form.addRow('مدة ظهور النافذة', self.duration)
+        self.duration.setToolTip('من 4 إلى 30 ثانية. اكتب المدة أو استخدم − و +.')
+        self.duration.setAccessibleName('مدة ظهور النافذة بالثواني')
+        duration_row = QHBoxLayout()
+        duration_row.setSpacing(6)
+        duration_row.addWidget(self.duration, 1)
+        self.duration_decrease = HoverButton('−')
+        self.duration_increase = HoverButton('+')
+        for button, title, action in (
+            (self.duration_decrease, 'تقليل مدة ظهور النافذة', self.duration.stepDown),
+            (self.duration_increase, 'زيادة مدة ظهور النافذة', self.duration.stepUp),
+        ):
+            button.setFixedSize(40, 40)
+            button.setAccessibleName(title)
+            button.setToolTip(title)
+            button.clicked.connect(action)
+            duration_row.addWidget(button)
+
+        def update_duration_steps(value):
+            self.duration_decrease.setEnabled(value > self.duration.minimum())
+            self.duration_increase.setEnabled(value < self.duration.maximum())
+
+        self.duration.valueChanged.connect(update_duration_steps)
+        update_duration_steps(self.duration.value())
+        form.addRow('مدة ظهور النافذة', duration_row)
         self.native_fallback = QCheckBox('عرض إشعار Windows أيضاً (اختياري)')
         self.native_fallback.setChecked(prefs.native_fallback)
         form.addRow(self.native_fallback)
@@ -232,7 +280,8 @@ class SettingsDialog(QDialog):
 
     def _browse_audio(self, field):
         selected, _ = QFileDialog.getOpenFileName(
-            self, 'اختر ملف صوت', '', 'ملفات صوت (*.wav *.mp3 *.ogg *.m4a *.flac);;كل الملفات (*)')
+            self, tr('اختر ملف صوت', self.language), '',
+            tr('ملفات صوت (*.wav *.mp3 *.ogg *.m4a *.flac);;كل الملفات (*)', self.language))
         if selected:
             field.setText(selected)
 
@@ -276,7 +325,7 @@ class SettingsDialog(QDialog):
         choose = HoverButton('اختيار اللون')
 
         def pick():
-            color = QColorDialog.getColor(QColor(edit.text()), self, title)
+            color = QColorDialog.getColor(QColor(edit.text()), self, tr(title, self.language))
             if color.isValid():
                 edit.setText(color.name().upper())
         choose.clicked.connect(pick)
@@ -334,6 +383,28 @@ class SettingsDialog(QDialog):
             self.foreground.setText(foreground)
             self.accent.setText(accent)
 
+    def _build_general(self, prefs, startup_enabled):
+        form = self._tab('البرنامج')
+        self.interface_language = QComboBox()
+        self.interface_language.addItem('العربية', 'ar')
+        self.interface_language.addItem('English', 'en')
+        self.interface_language.setCurrentIndex(0 if prefs.language == 'ar' else 1)
+        form.addRow('اللغة', self.interface_language)
+        hint = QLabel(
+            'تُطبّق اللغة عند الحفظ، ويمكن تبديلها أيضاً من الزر AR / EN في النافذة الرئيسية.')
+        hint.setWordWrap(True)
+        hint.setObjectName('hint')
+        form.addRow(hint)
+        self.start_on_login = QCheckBox('بدء البرنامج تلقائياً عند تسجيل الدخول إلى Windows')
+        self.start_on_login.setChecked(prefs.start_on_login if startup_enabled is None
+                                       else startup_enabled)
+        form.addRow(self.start_on_login)
+        hint = QLabel('خيار اختياري لحسابك الحالي. يبدأ في شريط النظام عند توفره. '
+                      'لا يتغير حتى تضغط حفظ.')
+        hint.setWordWrap(True)
+        hint.setObjectName('hint')
+        form.addRow(hint)
+
     def _collect_prefs(self):
         prefs = ReminderPrefs(
             enabled=self.alerts.isChecked(), early_minutes=self.early.currentData(),
@@ -349,13 +420,15 @@ class SettingsDialog(QDialog):
             foreground=self.foreground.text().strip(), accent=self.accent.text().strip(),
             border=self.border.currentData(), native_fallback=self.native_fallback.isChecked(),
             reduced_motion=self.reduced_motion.isChecked(),
+            language=self.interface_language.currentData(),
+            start_on_login=self.start_on_login.isChecked(),
         )
         prefs.validate()
         return prefs
 
     def _collect_config(self):
         conf = Config(
-            city=self.city.currentText(), lat=self.lat.value(), lon=self.lon.value(),
+            city=self._city_value(), lat=self.lat.value(), lon=self.lon.value(),
             tz_name=self.tz.currentText().strip(), fajr_angle=self.fajr.value(),
             isha_angle=self.isha.value(), asr_shadow=self.asr.currentData(),
             offsets={name: field.value() for name, field in self.offsets.items()},
@@ -369,7 +442,8 @@ class SettingsDialog(QDialog):
         try:
             prefs = self._collect_prefs()
         except ValueError as error:
-            QMessageBox.warning(self, 'إعداد غير صالح', str(error))
+            QMessageBox.warning(self, tr('إعداد غير صالح', self.language),
+                                error_text(error, self.language))
             return
         self.preview_requested.emit(prefs, self.preview_kind.currentData())
 
@@ -385,7 +459,8 @@ class SettingsDialog(QDialog):
             if self._commit is not None:
                 self._commit(conf, prefs)
         except (ValueError, OSError) as error:
-            QMessageBox.warning(self, 'تعذّر حفظ الإعدادات', str(error))
+            QMessageBox.warning(self, tr('تعذّر حفظ الإعدادات', self.language),
+                                error_text(error, self.language))
             return
         self.result_config = conf
         self.result_prefs = prefs

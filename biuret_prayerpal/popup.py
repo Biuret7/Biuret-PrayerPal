@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QFrame,
 from .preferences import popup_geometry, popup_start_geometry
 from .sound import SoundService
 from .theme import HoverButton
+from .i18n import tr
 
 
 class Toast(QWidget):
@@ -31,7 +32,8 @@ class Toast(QWidget):
                             | Qt.WindowType.WindowDoesNotAcceptFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft if prefs.language == 'ar'
+                                else Qt.LayoutDirection.LeftToRight)
         self.setObjectName('toast')
         layout = QVBoxLayout(self)
         layout.setContentsMargins(17, 17, 17, 17)
@@ -76,8 +78,8 @@ class Toast(QWidget):
         close.setProperty('accentColor', prefs.accent)
         close.setFixedSize(27, 27)
         close.setCursor(Qt.CursorShape.PointingHandCursor)
-        close.setToolTip('إغلاق الإشعار')
-        close.setAccessibleName('إغلاق الإشعار وإيقاف الصوت')
+        close.setToolTip(tr('إغلاق الإشعار', prefs.language))
+        close.setAccessibleName(tr('إغلاق الإشعار وإيقاف الصوت', prefs.language))
         close.clicked.connect(lambda: self.close_animated(manual=True))
         top.addWidget(close)
         inner.addLayout(top)

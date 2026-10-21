@@ -1,3 +1,18 @@
+# V1.0.1 — 2026-10-21
+
+- Popup duration has explicit −/+ buttons, a 4–30 second hint, and mouse/typing/preview/save regression coverage.
+- Mouse clicks no longer retain a bright focus border; keyboard focus stays visible.
+- Clear current-prayer label and explicit "Sunrise today" information.
+- Informative idle audio state; Stop Audio appears while playback is active.
+- Animated sun/moon button and theme crossfade; respects reduced motion and rapid toggles.
+- Arabic/English interface including settings, tray menu and reminder text; stable stored IDs.
+- Opt-in current-user Windows login startup, with registry rollback on preference failure.
+- Rounded settings panes across all six tabs and clean numeric/time input borders.
+- Versioned local build outputs and additional source/frozen verification.
+
+Windows x64 installer, bundled Adhan and source are available in the V1.0.1 release.
+The app and installer are unsigned; clean-PC and real login-session checks remain unverified.
+
 # V1.0.0 — 2026-10-20
 
 Installer packaging update: the primary EXE download now runs a per-user setup wizard.

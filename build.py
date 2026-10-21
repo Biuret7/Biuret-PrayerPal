@@ -202,7 +202,8 @@ def main() -> int:
         release.mkdir(exist_ok=True)
         if linked(release):
             raise OSError('The release directory must not be a link or junction.')
-        destination = release / candidate.name
+        from biuret_prayerpal.core import APP_VERSION
+        destination = release / f'BiuretPrayerPal-V{APP_VERSION}-Windows-x64.exe'
         with tempfile.NamedTemporaryFile(dir=release, prefix='.prayerpal-',
                                          delete=False) as stream:
             publishing = Path(stream.name)
@@ -216,12 +217,14 @@ def main() -> int:
             f'{checksum}  {destination.name}\n', encoding='ascii')
         shutil.copyfile(ROOT / 'packaging/THIRD_PARTY_NOTICES.txt',
                         release / 'THIRD_PARTY_NOTICES.txt')
-        details = dict(timestamp_utc=stamp, python=platform.python_version(),
+        details = dict(version=APP_VERSION, executable=destination.name,
+                       timestamp_utc=stamp, python=platform.python_version(),
                        architecture=platform.machine(), dependencies=versions, sha256=checksum,
                        bytes=destination.stat().st_size, smoke_tested=not arguments.skip_smoke,
                        build_log=build_log.relative_to(ROOT).as_posix(),
                        smoke_report=smoke_report.relative_to(ROOT).as_posix(), signed=False)
-        (release / 'BUILD_INFO.json').write_text(json.dumps(details, indent=2), encoding='utf-8')
+        (release / f'V{APP_VERSION}-BUILD_INFO.json').write_text(
+            json.dumps(details, indent=2), encoding='utf-8')
         print(f'Created: {destination}\nSHA-256: {checksum}', flush=True)
         if arguments.skip_smoke:
             print('NOT SMOKE TESTED: --skip-smoke was explicitly selected.')

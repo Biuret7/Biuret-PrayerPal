@@ -8,7 +8,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 APP_NAME = "Biuret PrayerPal"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 DEFAULT_TZ = "Asia/Hebron"
 PRAYERS = (
     ("Fajr", "الفجر"),

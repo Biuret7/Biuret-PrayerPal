@@ -97,6 +97,10 @@ else:
             if QThread.currentThread() != self.thread():
                 raise RuntimeError('SoundService must be used on its owning Qt thread.')
 
+        @property
+        def is_active(self):
+            return self._active
+
         def _retire_player(self):
             self._set_active(False)
             if self.player is not None:

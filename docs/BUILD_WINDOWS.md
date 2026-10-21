@@ -3,6 +3,8 @@
 
 # Build Biuret PrayerPal for Windows
 
+Version 1.0.1 is distributed as a Windows installer. Building remains local; these scripts never upload to GitHub.
+
 These are the complete build inputs for the existing **PySide6 / Qt 6** application.
 The source does not use PyQt6, so the spec deliberately excludes PyQt6/PyQt5 rather
 than mixing Qt bindings. No binding migration is needed to create the executable.
@@ -24,7 +26,7 @@ Set-Location Biuret-PrayerPal
 py -3.14 -m venv .venv-build
 & .\.venv-build\Scripts\python.exe -m pip install -r requirements-build.txt
 & .\.venv-build\Scripts\python.exe build.py
-& .\release\BiuretPrayerPal.exe
+& .\release\BiuretPrayerPal-V1.0.1-Windows-x64.exe
 ```
 
 Activation is optional; using the venv executable explicitly avoids installing into
@@ -35,8 +37,8 @@ python -m pip install -r requirements-build.txt
 python build.py
 ```
 
-The output is `release/BiuretPrayerPal.exe`, accompanied by a SHA-256 checksum,
-`BUILD_INFO.json`, and `THIRD_PARTY_NOTICES.txt`. It is a portable one-file executable,
+The output is `release/BiuretPrayerPal-V1.0.1-Windows-x64.exe`, with its SHA-256 checksum,
+`V1.0.1-BUILD_INFO.json` and notices. It is the one-file application payload,
 not an MSI/setup wizard. PyInstaller collects the interpreter and runtime dependencies.
 
 ## Build options and safe cleanup
@@ -90,7 +92,7 @@ the one-file extraction directory. [PyInstaller's resource notes](https://pyinst
 explain why changes there do not survive application exit.
 
 The spec uses `console=False` (the equivalent of `--windowed/--noconsole`), sets
-`icon=...`, and disables UPX. Windows version metadata identifies version 1.0.0.
+`icon=...`, and disables UPX. Windows version metadata identifies version 1.0.1.
 The app runs without administrator elevation. [Spec-file documentation](https://pyinstaller.org/en/stable/spec-files.html)
 describes how `Analysis`, `PYZ`, and `EXE` replace corresponding command-line options.
 
@@ -122,7 +124,8 @@ within Qt 6, so review that choice before a future Qt 7 migration.
    WAV playback through EndOfMedia and bundled Adhan MP3 playback with output muted. Test settings use a temporary
    INI file, not the user's registry settings. An eight-second in-app watchdog and
    an outer process deadline report failure instead of false success.
-5. Publishes the candidate and checksum, then cleans staging files.
+5. Copies the candidate and checksum to the local release folder, then cleans staging files.
+   It never uploads to GitHub. Versioned outputs preserve previous release files.
 
 The ordinary source suite also covers cleanup refusal, directory containment, and
 concurrent build locking. Run it with `python prayerpal.py --self-test`; Qt tests are
@@ -134,6 +137,7 @@ instead.
 
 The generated EXE is unsigned. Authenticode signing, an installer, clean-PC testing
 without Python, and hardware/codec coverage remain separate distribution checks.
+The local NSIS installer workflow is documented in INSTALLER.md.
 Keep applicable license notices and meet the bundled dependencies' redistribution
 obligations; packaging itself does not grant rights to third-party recordings or
 remove license requirements. No certificate or publisher identity was invented.

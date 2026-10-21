@@ -1,3 +1,6 @@
+> Historical 1.0.0 evidence. For the local 1.0.1 candidate see
+> [V1.0.1_REVIEW.md](V1.0.1_REVIEW.md) and [its verification summary](V1.0.1_VERIFICATION.json).
+
 # V1.0.0 verification — 2026-10-20
 
 Verified on Windows x64, Python 3.14.6 and PySide6/Qt 6.12.0.

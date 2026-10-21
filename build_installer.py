@@ -57,6 +57,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--makensis', help='Path to the official NSIS 3.13 compiler')
     parser.add_argument('--app-exe', type=Path, help='Validated PyInstaller x64 payload')
+    parser.add_argument('--validation-namespace', action='store_true',
+                        help='Test-only OS identity; output stays under artifacts, never release')
     arguments = parser.parse_args()
     if os.name != 'nt':
         parser.error('Build the Windows installer on Windows.')
@@ -97,10 +99,13 @@ def main() -> int:
                            f'/DPAYLOAD_EXE={payload}', f'/DOUTPUT_EXE={candidate}',
                            f'/DINSTALL_SIZE_KB={(payload.stat().st_size + 1023) // 1024 + 256}',
                            str(ROOT / 'packaging/installer.nsi')]
+                if arguments.validation_namespace:
+                    command.insert(-1, '/DVALIDATION_BUILD')
                 print('Building installer with NSIS 3.13...', flush=True)
                 build.run(command, logs / f'{stamp}-makensis.log', dict(os.environ),
                           timeout=300, cwd=ROOT)
-                release = ROOT / 'release'
+                release = (logs / 'validation-V1.0.1' if arguments.validation_namespace
+                           else ROOT / 'release')
                 release.mkdir(exist_ok=True)
                 if build.linked(release):
                     raise ValueError('The release directory must not be a link or junction.')
@@ -118,11 +123,12 @@ def main() -> int:
                     f'{digest}  {NAME}\n', encoding='ascii')
                 metadata = dict(version=APP_VERSION, compiler='NSIS 3.13',
                                 installer=NAME, sha256=digest,
+                                validation_namespace=arguments.validation_namespace,
                                 bytes=destination.stat().st_size, signed=False,
                                 payload_sha256=hashlib.sha256(payload.read_bytes()).hexdigest(),
                                 payload_smoke_passed=True, scope='current user',
                                 install_lifecycle_tested=False)
-                (release / 'INSTALLER_BUILD_INFO.json').write_text(
+                (release / f'V{APP_VERSION}-INSTALLER_BUILD_INFO.json').write_text(
                     json.dumps(metadata, indent=2), encoding='utf-8')
                 print(f'Created {destination}\nSHA-256: {digest}')
         return 0

@@ -1,0 +1,87 @@
+{
+  "version": "1.0.1",
+  "status": "LOCAL CANDIDATE - NOT PUBLISHED",
+  "created_utc": "2026-10-20T17:54:22.772499+00:00",
+  "dependencies": {
+    "PyInstaller": "6.21.0",
+    "pyinstaller-hooks-contrib": "2026.6",
+    "PySide6": "6.12.0",
+    "tzdata": "2026.5"
+  },
+  "python": "3.14.6",
+  "source_checks": {
+    "windows": {
+      "core_tests": 40,
+      "qt_process_tests": 31,
+      "pep8": true,
+      "compile": true,
+      "screenshots": true,
+      "source_report_sha256": "c84d27bc54dcabfa04bdf15013d42b8009fabc0e4ab1aefde14257de53809bc1"
+    },
+    "offscreen": {
+      "core_tests": 40,
+      "qt_process_tests": 31,
+      "pep8": true,
+      "compile": true,
+      "screenshots": true,
+      "source_report_sha256": "81bafaca5d5c4fc5baf5be3ad36d74d7f4e07800e341fa0d2a5358bf4b6ad94a"
+    }
+  },
+  "frozen_checks": {
+    "assets": true,
+    "timezone_and_calculation": true,
+    "window_icon": true,
+    "settings_preview": true,
+    "duration_stepper_preview": true,
+    "english_interface": true,
+    "english_numeric_editor_visible_width": true,
+    "theme_animation_started": true,
+    "native_media_end_of_file_muted": true,
+    "bundled_adhan_mp3_playback_muted": true,
+    "qt_window_visible": true
+  },
+  "installer_pe_checks": {
+    "gui_subsystem": true,
+    "version_1_0_1": true,
+    "asInvoker": true,
+    "unsigned": true
+  },
+  "installer": {
+    "filename": "BiuretPrayerPal-V1.0.1-Setup-Windows-x64.exe",
+    "sha256": "96028a32770b660d8312fdd95bbae79ee57e67d48f35ef43ae1bb63a5af564e7",
+    "bytes": 61048572,
+    "production_identity_lifecycle": "REFUSED: pre-existing product shortcut preserved",
+    "validation_namespace_lifecycle": {
+      "passed": true,
+      "validation_namespace": true,
+      "checks": {
+        "unowned_folder_refused": true,
+        "install_unicode_path_registration_shortcut": true,
+        "reinstall_preserves_extra_files": true,
+        "locked_payload_blocks_install_and_uninstall": true,
+        "installed_app_gui_audio_smoke": true,
+        "uninstall_startup_exact_owner_removed_other_owner_preserved": true,
+        "production_install_startup_shortcuts_unchanged": true,
+        "uninstall_preserves_user_files_and_preferences": true
+      },
+      "installer_sha256": "8c4c97cf84d16ca384e79407ed543923a0a53792ec7a0ce68ccedeb483199172",
+      "payload_sha256": "f4d1a5e799550f52c68cb49002d1b3ccc09c3b3a299ffc53cbc234c359e5bb31"
+    }
+  },
+  "payload": {
+    "filename": "BiuretPrayerPal-V1.0.1-Windows-x64.exe",
+    "sha256": "f4d1a5e799550f52c68cb49002d1b3ccc09c3b3a299ffc53cbc234c359e5bb31",
+    "bytes": 61347886
+  },
+  "original_v1_0_0_exe_and_installer_hashes_preserved": true,
+  "build_and_dist_cleaned": true,
+  "unverified": [
+    "Actual interactive Windows logout/login startup journey",
+    "Production-identity installation over the user personal install",
+    "Clean Windows machine without development runtimes",
+    "Interactive wizard/Narrator; real multi-monitor and DPI/device coverage",
+    "Authenticode signing"
+  ],
+  "publication_performed": false,
+  "local_revision": "duration-control-fix"
+}

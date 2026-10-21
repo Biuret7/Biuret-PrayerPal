@@ -1,8 +1,10 @@
-# Windows installer — V1.0.0
+# Windows installer — V1.0.1
 
-Download **BiuretPrayerPal-V1.0.0-Windows-x64.exe** from the
-[release](https://github.com/Biuret7/Biuret-PrayerPal/releases/tag/V1.0.0).
-This primary download now runs the installer. Its existing URL is retained.
+Download **BiuretPrayerPal-V1.0.1-Setup-Windows-x64.exe** from the
+[V1.0.1 release](https://github.com/Biuret7/Biuret-PrayerPal/releases/tag/V1.0.1).
+See [V1.0.1_REVIEW.md](V1.0.1_REVIEW.md) for validation and remaining checks.
+
+## Install
 
 1. Run the wizard and select Arabic or English.
 2. Keep the default current-user application folder, or select an empty folder.
@@ -25,6 +27,9 @@ Remove it through Windows **Settings → Apps → Installed apps → Biuret Pray
 The uninstaller removes explicitly installed files and shortcuts. Personal
 preferences under `MyApps/PrayerReminder`, custom audio, and unrelated files remain.
 It does not recursively erase the installation directory.
+In 1.0.1, uninstallation also removes the startup Run value only when it exactly
+matches this installation's executable command. Preferences are retained; startup
+is opt-in and can be enabled again after reinstalling.
 
 The release distributes the Windows installer. The earlier Portable download and
 its checksum files have been removed from the release.
@@ -49,14 +54,14 @@ Get-FileHash artifacts/installer-tools/nsis-3.13.zip -Algorithm SHA256
 Expand-Archive artifacts/installer-tools/nsis-3.13.zip artifacts/installer-tools
 python -m pip install -r requirements-build.txt
 python build.py
-python build_installer.py --app-exe release/BiuretPrayerPal.exe
+python build_installer.py --app-exe release/BiuretPrayerPal-V1.0.1-Windows-x64.exe
 ```
 
 For an installed compiler, pass `--makensis` with its full `makensis.exe` path.
 `build_installer.bat` is the double-click wrapper after dependencies and the payload
-are prepared. The output is `release/BiuretPrayerPal-V1.0.0-Setup-Windows-x64.exe`,
-its SHA-256 file and `INSTALLER_BUILD_INFO.json`. The release publishes these same
-installer bytes using the existing primary download filename without `-Setup`.
+are prepared. The output is `release/BiuretPrayerPal-V1.0.1-Setup-Windows-x64.exe`,
+its SHA-256 file and `V1.0.1-INSTALLER_BUILD_INFO.json`. No upload is performed.
+For a future release, use the Setup file as the user-facing installer.
 
 The build checks payload version, x64 machine type, GUI subsystem, icon/resources,
 plugins and bundled audio, then executes the actual frozen payload with isolated
@@ -73,7 +78,7 @@ from the official compiler package and installed beside the application.
 On a Windows account without an existing PrayerPal installer registration/shortcut:
 
 ```powershell
-python scripts/test_installer.py --installer release/BiuretPrayerPal-V1.0.0-Setup-Windows-x64.exe --payload release/BiuretPrayerPal.exe
+python scripts/test_installer.py --installer release/BiuretPrayerPal-V1.0.1-Setup-Windows-x64.exe --payload release/BiuretPrayerPal-V1.0.1-Windows-x64.exe
 ```
 
 This real integration test temporarily registers a test installation and creates its
@@ -82,6 +87,22 @@ an existing product installation/shortcut. It covers a Unicode path with spaces,
 reinstallation, locked executable refusal, installed GUI/audio playback, preference
 preservation and survival of unrelated files. The report stays in
 `artifacts/installer-lifecycle.json`; test evidence stays under `artifacts/`.
+
+When a real shortcut/installation already exists, preserve it and test the same
+installer logic with a separate validation identity:
+
+```powershell
+python build_installer.py --app-exe release/BiuretPrayerPal-V1.0.1-Windows-x64.exe --validation-namespace
+python scripts/test_installer.py --validation-namespace --installer artifacts/installer/validation-V1.0.1/BiuretPrayerPal-V1.0.1-Setup-Windows-x64.exe --payload release/BiuretPrayerPal-V1.0.1-Windows-x64.exe
+```
+
+The validation build stays under `artifacts/`, has separate registry/shortcut/startup
+names and must not be distributed. The lifecycle runner checks its metadata and
+hashes before execution. It also checks startup-command ownership on uninstall and
+compares production registrations, startup values, shortcuts and preferences before
+and after. Its report is `artifacts/installer-lifecycle-V1.0.1-validation.json`.
+This is logic validation with an isolated OS identity, not installation of the
+production Setup bytes over an existing personal installation.
 
 Clean-machine certification, signing, interactive wizard/Narrator and broad hardware
 testing remain unverified. The original V1.0.0 Git tag remains the application source

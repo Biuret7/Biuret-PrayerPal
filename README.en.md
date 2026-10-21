@@ -1,17 +1,19 @@
-# Biuret PrayerPal — V1.0.0
+# Biuret PrayerPal — V1.0.1
+
+[What changed in 1.0.1?](docs/RELEASE_V1.0.1.md) · [Verification details](docs/V1.0.1_REVIEW.md)
 
 ### A calm companion for prayer and remembrance
 
 A Windows desktop app with offline prayer-time calculations, a next-prayer countdown,
-customizable prayer/Azkar reminders, Arabic RTL UI, and local preferences.
+customizable prayer/Azkar reminders, Arabic RTL / English LTR UI, and local preferences.
 
-[العربية](README.md) · [Download Windows release](https://github.com/Biuret7/Biuret-PrayerPal/releases/tag/V1.0.0)
+[العربية](README.md) · [Download Windows release](https://github.com/Biuret7/Biuret-PrayerPal/releases/tag/V1.0.1)
 
-![Dark dashboard](docs/images/main-dark.png)
+![Dark dashboard](docs/images/v1.0.1/main-dark-en.png)
 
 ## Install without Python
 
-Download `BiuretPrayerPal-V1.0.0-Windows-x64.exe` from the [V1.0.0 release](https://github.com/Biuret7/Biuret-PrayerPal/releases/tag/V1.0.0).
+Download `BiuretPrayerPal-V1.0.1-Setup-Windows-x64.exe` from the [V1.0.1 release](https://github.com/Biuret7/Biuret-PrayerPal/releases/tag/V1.0.1).
 The primary download is now a **Windows installer**. Run its wizard, then open the app
 from Start. It installs for your current account without administrator elevation,
 with a Start shortcut, optional desktop shortcut, and Windows uninstall entry.
@@ -24,10 +26,13 @@ Configure your city and time zone before relying on its reminders.
 **The Adhan / The Call to Prayer — Omar Hisham Al Arabi** is included inside the EXE
 and at [assets/sounds/adhan-omar-hisham-al-arabi.mp3](assets/sounds/adhan-omar-hisham-al-arabi.mp3).
 
-1. Open **الإعدادات** (Settings), then **الصوت** (Sound).
-2. Select **أذان عمر هشام العربي (مرفق)** — bundled Adhan by Omar Hisham Al Arabi.
-3. Turn Mute off, set volume above zero, and click **اختبار التذكير** (Test Reminder).
-4. Use **إيقاف الصوت** (Stop Audio) to stop the recording.
+1. In 1.0.1, click **EN** in the header, then open **Settings → Sound**.
+2. Select **Omar Hisham Al Arabi Adhan (included)**.
+3. Turn Mute off, set volume above zero, and click **Test reminder**.
+4. Use **Stop audio**, which appears during playback, to stop the recording.
+
+In published 1.0.0 these controls are **الإعدادات → الصوت → أذان عمر هشام العربي (مرفق)**,
+then **اختبار التذكير** and **إيقاف الصوت**.
 
 The default remains the short chime; the included recording plays when selected.
 Personal Adhan and Azkar files are also supported. See the [recording credit](assets/sounds/README.md).
@@ -40,6 +45,14 @@ Personal Adhan and Azkar files are also supported. See the [recording credit](as
 - Five popup positions, fade/slide/zoom, custom colors/borders, and reduced motion.
 - Dark/light themes, current-value previews before saving, volume/mute, and system tray operation.
 - Local QSettings persistence and single-instance protection.
+- English/Arabic switch via AR / EN in the header or Settings → App → Language.
+- Animated theme switching; respects the reduced-motion preference.
+- Optional startup via Settings → App → Start PrayerPal when I sign in to Windows.
+
+Startup changes apply only on Save; Cancel and Test Reminder do not register anything.
+Startup opens in the notification area when available, otherwise shows the main window.
+The current prayer appears above the timetable; sunrise is explicitly today's solar
+information. Stop Audio appears during playback; an informative label appears when idle.
 
 Prayer times are adjustable astronomical estimates, not an official timetable. Compare with
 local published times. Alerts require the computer and application to be running; events

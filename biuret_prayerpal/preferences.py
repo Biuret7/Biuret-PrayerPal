@@ -43,12 +43,16 @@ class ReminderPrefs:
     border: str = 'glow'
     native_fallback: bool = False
     reduced_motion: bool = False
+    language: str = 'ar'
+    start_on_login: bool = False
 
     def validate(self) -> None:
         for name in ('enabled', 'morning_azkar', 'evening_azkar', 'muted',
-                     'native_fallback', 'reduced_motion'):
+                     'native_fallback', 'reduced_motion', 'start_on_login'):
             if type(getattr(self, name)) is not bool:
                 raise ValueError(f'Invalid boolean preference: {name}')
+        if self.language not in ('ar', 'en'):
+            raise ValueError('Unsupported interface language')
         for name in ('early_minutes', 'volume', 'duration_seconds'):
             if type(getattr(self, name)) is not int:
                 raise ValueError(f'Invalid integer preference: {name}')

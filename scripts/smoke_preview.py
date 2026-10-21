@@ -50,7 +50,7 @@ def main():
 
     def capture(widget, name):
         pixels = widget.grab()
-        if name == 'popup':
+        if name.startswith('popup'):
             # Render the translucent toast over the app surface for PNG viewers
             # that otherwise display transparent RGB channels at full opacity.
             surface = QPixmap(pixels.size())
@@ -85,7 +85,8 @@ def main():
         dialog.resize(680, 720)
         dialog.show()
         QTest.qWait(280)
-        for index, name in enumerate(('location', 'calculation', 'reminders', 'sound', 'popup')):
+        tabs = ('location', 'calculation', 'reminders', 'sound', 'popup', 'app')
+        for index, name in enumerate(tabs):
             dialog.tabs.setCurrentIndex(index)
             QTest.qWait(30)
             capture(dialog, f'settings-{name}')
@@ -96,6 +97,27 @@ def main():
         toast.display()
         QTest.qWait(300)
         capture(toast, 'popup')
+        toast.discard()
+        window._toggle_language()
+        QTest.qWait(30)
+        capture(window, 'main-dark-en')
+        window._toggle_theme()
+        QTest.qWait(350)
+        capture(window, 'main-light-en')
+        dialog = SettingsDialog(window.conf, window.prefs, window)
+        dialog.show()
+        QTest.qWait(280)
+        for index, name in enumerate(tabs):
+            dialog.tabs.setCurrentIndex(index)
+            QTest.qWait(30)
+            capture(dialog, f'settings-{name}-en-light')
+        dialog.reject()
+        QTest.qWait(180)
+        toast = Toast('Time for prayer', 'It is time for Dhuhr. May your prayers be accepted.',
+                      ReminderPrefs(language='en', animation='zoom', muted=True))
+        toast.display()
+        QTest.qWait(300)
+        capture(toast, 'popup-en')
         toast.discard()
         window._quit()
     print(f'UI screenshots saved to {output}')

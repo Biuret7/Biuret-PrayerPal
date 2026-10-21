@@ -35,7 +35,7 @@ def main():
         outcome = unittest.TextTestRunner(verbosity=2).run(suite)
         return 0 if outcome.wasSuccessful() else 1
     try:
-        from PySide6.QtCore import QLockFile, QStandardPaths
+        from PySide6.QtCore import QLockFile, QStandardPaths, QSettings
         from PySide6.QtGui import QFont
         from PySide6.QtWidgets import QApplication, QMessageBox
     except ImportError as error:
@@ -51,6 +51,9 @@ def main():
     app.setOrganizationName('Biuret')
     app.setFont(QFont('Segoe UI', 10))
     app.setQuitOnLastWindowClosed(False)
+    from biuret_prayerpal.i18n import tr
+    from biuret_prayerpal.storage import load_reminders
+    language = load_reminders(QSettings('MyApps', 'PrayerReminder')).language
     from pathlib import Path
     try:
         data = Path(QStandardPaths.writableLocation(
@@ -61,15 +64,19 @@ def main():
         if not instance_lock.tryLock(0):
             QMessageBox.information(
                 None, 'Biuret PrayerPal',
-                'التطبيق قيد التشغيل بالفعل أو تعذّر قفل مجلد البيانات. '
-                'تحقق من أيقونة شريط النظام.',
+                tr('التطبيق قيد التشغيل بالفعل أو تعذّر قفل مجلد البيانات. '
+                   'تحقق من أيقونة شريط النظام.', language),
             )
             return 1
     except OSError:
-        QMessageBox.critical(None, 'Biuret PrayerPal', 'تعذّر فتح مجلد بيانات التطبيق للكتابة.')
+        QMessageBox.critical(None, 'Biuret PrayerPal',
+                             tr('تعذّر فتح مجلد بيانات التطبيق للكتابة.', language))
         return 1
     window = MainWindow()
-    window.show()
+    if '--startup' in sys.argv and window.tray_available:
+        window.hide()
+    else:
+        window.show()
     return app.exec()
 
 
